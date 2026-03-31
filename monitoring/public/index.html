@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Agent System — Dashboard</title>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161922;
+    --surface2: #1e2330;
+    --border: #2a3045;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --accent: #6366f1;
+    --green: #10b981;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; color: var(--accent); }
+  .logo span { color: var(--text); }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--green);
+    background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3);
+    padding: 3px 10px; border-radius: 20px;
+  }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .header-right { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+  .container { padding: 20px 24px; max-width: 1400px; }
+
+  /* Stats row */
+  .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .stat-value { font-size: 26px; font-weight: 700; line-height: 1; }
+  .stat-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .v-green { color: var(--green); }
+  .v-amber { color: var(--amber); }
+  .v-red { color: var(--red); }
+  .v-blue { color: var(--blue); }
+  .v-purple { color: var(--purple); }
+  .v-accent { color: var(--accent); }
+
+  /* Two-col layout */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted);
+  }
+  .panel-header .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  .panel-body { padding: 14px 16px; }
+
+  /* Agent cards */
+  .agent-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .agent-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px;
+  }
+  .agent-name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .agent-stat { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .agent-stat span:last-child { color: var(--text); }
+  .agent-status { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .status-dot.ok { background: var(--green); }
+  .status-dot.warn { background: var(--amber); }
+  .status-dot.err { background: var(--red); }
+
+  /* Queue bars */
+  .queue-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .queue-name { width: 130px; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .queue-bar-bg { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .queue-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .queue-count { width: 32px; text-align: right; font-size: 11px; color: var(--text); }
+
+  /* Event log */
+  .event-log { font-size: 11px; max-height: 280px; overflow-y: auto; }
+  .event-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 7px 0; border-bottom: 1px solid var(--border);
+  }
+  .event-row:last-child { border-bottom: none; }
+  .event-time { color: var(--muted); width: 56px; flex-shrink: 0; }
+  .event-badge {
+    font-size: 10px; padding: 1px 6px; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .badge-received   { background: rgba(99,102,241,0.15); color: var(--accent); }
+  .badge-classified { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .badge-routed     { background: rgba(139,92,246,0.15); color: var(--purple); }
+  .badge-executing  { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .badge-completed  { background: rgba(16,185,129,0.15); color: var(--green); }
+  .badge-failed     { background: rgba(239,68,68,0.15); color: var(--red); }
+  .event-text { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .event-text strong { color: var(--text); }
+
+  /* Classification donut */
+  .class-list { display: grid; gap: 8px; }
+  .class-row { display: flex; align-items: center; gap: 10px; }
+  .class-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .class-name { flex: 1; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+  .class-bar-bg { width: 80px; height: 4px; background: var(--surface2); border-radius: 2px; flex-shrink: 0; }
+  .class-bar-fill { height: 100%; border-radius: 2px; }
+  .class-count { width: 28px; text-align: right; font-size: 11px; color: var(--text); }
+
+  /* Notification log */
+  .notif-row { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+  .notif-row:last-child { border-bottom: none; }
+  .notif-channel {
+    font-size: 10px; padding: 1px 6px; border-radius: 3px;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .ch-slack    { background: rgba(74,144,226,0.15); color: #4a90e2; }
+  .ch-email    { background: rgba(16,185,129,0.15); color: var(--green); }
+  .ch-pagerduty{ background: rgba(239,68,68,0.15); color: var(--red); }
+  .notif-title { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .notif-status { color: var(--green); }
+  .notif-status.failed { color: var(--red); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .tab {
+    padding: 10px 20px; font-size: 12px; cursor: pointer;
+    color: var(--muted); border-bottom: 2px solid transparent;
+    transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none;
+    font-family: inherit; letter-spacing: 0.5px;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .empty { color: var(--muted); font-size: 12px; text-align: center; padding: 24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">MAS<span>/dashboard</span></div>
+  <div class="live-badge">
+    <span class="live-dot"></span>
+    LIVE
+  </div>
+  <div class="header-right" id="last-update">connecting...</div>
+</header>
+
+<div class="container">
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('overview')">Overview</button>
+    <button class="tab" onclick="switchTab('agents')">Agents</button>
+    <button class="tab" onclick="switchTab('events')">Events</button>
+    <button class="tab" onclick="switchTab('notifications')">Notifications</button>
+  </div>
+
+  <!-- Overview Tab -->
+  <div id="tab-overview" class="tab-content active">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value v-green" id="stat-completed">—</div><div class="stat-sub">last 24h</div></div>
+      <div class="stat-card"><div class="stat-label">Processing</div><div class="stat-value v-amber" id="stat-executing">—</div><div class="stat-sub">in-flight</div></div>
+      <div class="stat-card"><div class="stat-label">Failed</div><div class="stat-value v-red" id="stat-failed">—</div><div class="stat-sub">last 24h</div></div>
+      <div class="stat-card"><div class="stat-label">Queue Depth</div><div class="stat-value v-blue" id="stat-queue">—</div><div class="stat-sub">total</div></div>
+      <div class="stat-card"><div class="stat-label">Dead Letter</div><div class="stat-value v-purple" id="stat-dead">—</div><div class="stat-sub">unprocessed</div></div>
+      <div class="stat-card"><div class="stat-label">Received</div><div class="stat-value v-accent" id="stat-received">—</div><div class="stat-sub">last 24h</div></div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Queue depths -->
+      <div class="panel">
+        <div class="panel-header">Queue depths <span style="color:var(--green);font-size:10px">live</span></div>
+        <div class="panel-body" id="queue-bars">
+          <div class="empty">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Classification breakdown -->
+      <div class="panel">
+        <div class="panel-header">Classification breakdown</div>
+        <div class="panel-body" id="class-list">
+          <div class="empty">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agents Tab -->
+  <div id="tab-agents" class="tab-content">
+    <div class="panel">
+      <div class="panel-header">Agent health (24h)</div>
+      <div class="panel-body">
+        <div class="agent-grid" id="agent-cards">
+          <div class="empty">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Events Tab -->
+  <div id="tab-events" class="tab-content">
+    <div class="panel">
+      <div class="panel-header">Recent task events</div>
+      <div class="panel-body">
+        <div class="event-log" id="event-log">
+          <div class="empty">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notifications Tab -->
+  <div id="tab-notifications" class="tab-content">
+    <div class="panel">
+      <div class="panel-header">Notification log</div>
+      <div class="panel-body">
+        <div class="event-log" id="notif-log">
+          <div class="empty">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CLASS_COLORS = {
+  payment_event: '#10b981',
+  user_action: '#6366f1',
+  system_alert: '#f59e0b',
+  data_pipeline: '#3b82f6',
+  content_moderation: '#8b5cf6',
+  security_event: '#ef4444',
+  order_lifecycle: '#06b6d4',
+  notification_request: '#ec4899',
+  report_generation: '#84cc16',
+  unknown: '#64748b',
+};
+
+const QUEUE_COLORS = {
+  INCOMING: '#6366f1',
+  CLASSIFIED: '#3b82f6',
+  ROUTED: '#8b5cf6',
+  NOTIFICATIONS: '#f59e0b',
+  DEAD_LETTER: '#ef4444',
+};
+
+const fmtTime = (iso) => {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+};
+
+const fmtShort = (str) => str ? str.replace(/_/g, ' ') : '—';
+
+// ─── Data fetchers ──────────────────────────────────────────────────────────
+let overviewData = null;
+let classData = null;
+let notifData = null;
+
+const fetchOverview = async () => {
+  const res = await fetch('/api/overview');
+  overviewData = await res.json();
+  renderOverview();
+};
+
+const fetchClassifications = async () => {
+  const res = await fetch('/api/classifications');
+  classData = await res.json();
+  renderClassifications();
+};
+
+const fetchNotifications = async () => {
+  const res = await fetch('/api/notifications');
+  notifData = await res.json();
+  renderNotifications();
+};
+
+// ─── Renderers ──────────────────────────────────────────────────────────────
+const renderOverview = () => {
+  if (!overviewData) return;
+  const { tasks, agents, queues, recentEvents } = overviewData;
+
+  // Stats
+  const getCount = (status) => {
+    const row = tasks.find(t => t.status === status);
+    return row ? parseInt(row.count) : 0;
+  };
+  document.getElementById('stat-completed').textContent = getCount('completed');
+  document.getElementById('stat-executing').textContent = getCount('executing');
+  document.getElementById('stat-failed').textContent = getCount('failed');
+  document.getElementById('stat-received').textContent = getCount('received');
+
+  const totalQueue = queues.reduce((s, q) => s + q.depth, 0);
+  const deadDepth = queues.find(q => q.queue === 'DEAD_LETTER')?.depth || 0;
+  document.getElementById('stat-queue').textContent = totalQueue;
+  document.getElementById('stat-dead').textContent = deadDepth;
+
+  // Queue bars
+  const maxDepth = Math.max(...queues.map(q => q.depth), 1);
+  document.getElementById('queue-bars').innerHTML = queues.map(q => `
+    <div class="queue-row">
+      <div class="queue-name">${q.queue.replace(/_/g,' ')}</div>
+      <div class="queue-bar-bg">
+        <div class="queue-bar-fill" style="width:${Math.round((q.depth/maxDepth)*100)}%;background:${QUEUE_COLORS[q.queue]||'#64748b'}"></div>
+      </div>
+      <div class="queue-count">${q.depth}</div>
+    </div>
+  `).join('');
+
+  // Events
+  if (recentEvents && recentEvents.length > 0) {
+    renderEvents(recentEvents);
+  }
+
+  // Agents
+  if (agents && agents.length > 0) {
+    renderAgents(agents);
+  }
+};
+
+const renderClassifications = () => {
+  if (!classData || classData.length === 0) {
+    document.getElementById('class-list').innerHTML = '<div class="empty">No classifications yet</div>';
+    return;
+  }
+  const maxCount = Math.max(...classData.map(c => parseInt(c.count)));
+  document.getElementById('class-list').innerHTML = `<div class="class-list">` +
+    classData.map(c => `
+      <div class="class-row">
+        <div class="class-color" style="background:${CLASS_COLORS[c.category]||'#64748b'}"></div>
+        <div class="class-name">${fmtShort(c.category)}</div>
+        <div class="class-bar-bg">
+          <div class="class-bar-fill" style="width:${Math.round((parseInt(c.count)/maxCount)*100)}%;background:${CLASS_COLORS[c.category]||'#64748b'}"></div>
+        </div>
+        <div class="class-count">${c.count}</div>
+      </div>
+    `).join('') + `</div>`;
+};
+
+const renderAgents = (agents) => {
+  if (!agents || agents.length === 0) {
+    document.getElementById('agent-cards').innerHTML = '<div class="empty">No agent data yet</div>';
+    return;
+  }
+  document.getElementById('agent-cards').innerHTML = agents.map(a => {
+    const isHealthy = a.last_seen && (Date.now() - new Date(a.last_seen)) < 60000;
+    const failRate = a.total_processed > 0 ? (a.total_failed / a.total_processed * 100).toFixed(1) : 0;
+    return `
+    <div class="agent-card">
+      <div class="agent-status">
+        <div class="status-dot ${isHealthy ? 'ok' : 'warn'}"></div>
+        <div class="agent-name">${a.agent_name}</div>
+      </div>
+      <div class="agent-stat"><span>Processed</span><span>${a.total_processed || 0}</span></div>
+      <div class="agent-stat"><span>Failed</span><span style="color:${failRate > 10 ? 'var(--red)' : 'var(--text)'}">${a.total_failed || 0} (${failRate}%)</span></div>
+      <div class="agent-stat"><span>Avg latency</span><span>${a.avg_latency_ms ? Math.round(a.avg_latency_ms)+'ms' : '—'}</span></div>
+      <div class="agent-stat"><span>Queue depth</span><span>${a.avg_queue_depth ? Math.round(a.avg_queue_depth) : 0}</span></div>
+    </div>
+  `}).join('');
+};
+
+const renderEvents = (events) => {
+  if (!events || events.length === 0) {
+    document.getElementById('event-log').innerHTML = '<div class="empty">No events yet</div>';
+    return;
+  }
+  document.getElementById('event-log').innerHTML = events.map(e => `
+    <div class="event-row">
+      <div class="event-time">${fmtTime(e.event_time || e.created_at)}</div>
+      <span class="event-badge badge-${e.status||'received'}">${(e.event_type||e.status||'').replace(/_/g,' ')}</span>
+      <div class="event-text">
+        <strong>${e.classification || fmtShort(e.agent_name) || '—'}</strong>
+        ${e.id ? ` · ${e.id.split('-')[0]}` : ''}
+      </div>
+    </div>
+  `).join('');
+};
+
+const renderNotifications = () => {
+  const el = document.getElementById('notif-log');
+  if (!notifData || notifData.length === 0) {
+    el.innerHTML = '<div class="empty">No notifications sent yet</div>';
+    return;
+  }
+  el.innerHTML = notifData.map(n => `
+    <div class="notif-row">
+      <div class="event-time">${fmtTime(n.created_at)}</div>
+      <span class="notif-channel ch-${n.channel}">${n.channel}</span>
+      <div class="notif-title">${n.subject || '(no subject)'}</div>
+      <span class="notif-status ${n.status === 'failed' ? 'failed' : ''}">${n.status}</span>
+    </div>
+  `).join('');
+};
+
+// ─── SSE for live stats ──────────────────────────────────────────────────────
+const connectSSE = () => {
+  const es = new EventSource('/api/stream');
+  es.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'stats') {
+      document.getElementById('last-update').textContent = 'Updated ' + fmtTime(new Date().toISOString());
+      fetchOverview();
+    }
+  };
+  es.onerror = () => {
+    document.getElementById('last-update').textContent = 'reconnecting...';
+    setTimeout(connectSSE, 5000);
+    es.close();
+  };
+};
+
+// ─── Tab switching ───────────────────────────────────────────────────────────
+const switchTab = (name) => {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+
+  if (name === 'notifications') fetchNotifications();
+  if (name === 'agents') fetchOverview();
+};
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+const init = async () => {
+  await Promise.all([fetchOverview(), fetchClassifications()]);
+  connectSSE();
+  // Refresh classifications every 30s
+  setInterval(fetchClassifications, 30000);
+};
+
+init();
+</script>
+</body>
+</html>

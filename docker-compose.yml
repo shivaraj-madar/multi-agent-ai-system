@@ -1,0 +1,173 @@
+
+services:
+  # ─── Infrastructure ───────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: mas_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-multiagent}
+      POSTGRES_USER: ${POSTGRES_USER:-masuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-maspassword}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-masuser} -d ${POSTGRES_DB:-multiagent}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mas_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: mas_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redispass}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-redispass}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mas_net
+
+  # ─── Application Services ─────────────────────────────────────────
+  webhook-api:
+    build:
+      context: .
+      dockerfile: ./api/Dockerfile
+    container_name: mas_webhook_api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SERVICE_NAME: webhook-api
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - mas_net
+
+  classifier-agent:
+    build:
+      context: .
+      dockerfile: ./agents/Dockerfile.classifier
+    container_name: mas_classifier
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SERVICE_NAME: classifier-agent
+      AGENT_TYPE: classifier
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - mas_net
+
+  router-agent:
+    build:
+      context: .
+      dockerfile: ./agents/Dockerfile.router
+    container_name: mas_router
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SERVICE_NAME: router-agent
+      AGENT_TYPE: router
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - mas_net
+
+  executor-agent:
+    build:
+      context: .
+      dockerfile: ./agents/Dockerfile.executor
+    container_name: mas_executor
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SERVICE_NAME: executor-agent
+      AGENT_TYPE: executor
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - mas_net
+
+  notifier-agent:
+    build:
+      context: .
+      dockerfile: ./notifications/Dockerfile
+    container_name: mas_notifier
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SERVICE_NAME: notifier-agent
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - mas_net
+
+  # ─── Monitoring ───────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: ./monitoring/Dockerfile
+    container_name: mas_dashboard
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SERVICE_NAME: dashboard
+      PORT: 4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs:ro
+    networks:
+      - mas_net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  mas_net:
+    driver: bridge

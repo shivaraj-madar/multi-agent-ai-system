@@ -1,0 +1,8 @@
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --omit=dev
+COPY . .
+RUN ls -la /app/agents/
+RUN mkdir -p /app/logs
+CMD ["node", "agents/executor.js"]
